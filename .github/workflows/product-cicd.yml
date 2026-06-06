@@ -1,32 +1,25 @@
-name: Deploy to Productservice (ECS Fargate)
+name: CI/CD — Product Service
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
-  AWS_REGION:      us-east-1
-#  ENVIRONMENT:     prod
-  ECR_PRODUCT:     shopms-prod-product-service
-#  ECR_ORDER:       shopms-prod-order-service
-#  ECR_FRONTEND:    shopms-prod-frontend
-#  ECS_CLUSTER:     shopms-prod-cluster
-#  PRODUCT_SVC:     shopms-prod-product-service
-#  ORDER_SVC:       shopms-prod-order-service
-#  FRONTEND_SVC:    shopms-prod-frontend
+  AWS_REGION:  us-east-1
+  ECR_REPO:    shopms-prod-product-service
 
 jobs:
-  build-product:
-    name: Build Product Service
+  build-and-deploy:
+    name: Build, Push & Deploy Product Service
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.build.outputs.image }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -35,25 +28,39 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
           aws-region:            ${{ env.AWS_REGION }}
+
       - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      - name: Build & Push Product Service
+
+      - name: Build & Push Docker Image
         id: build
         env:
           REGISTRY:  ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_URI=$REGISTRY/$ECR_PRODUCT:$IMAGE_TAG
+          IMAGE_URI=$REGISTRY/$ECR_REPO:$IMAGE_TAG
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
-          docker tag $IMAGE_URI $REGISTRY/$ECR_PRODUCT:latest
-          docker push $REGISTRY/$ECR_PRODUCT:latest
+          docker tag $IMAGE_URI $REGISTRY/$ECR_REPO:latest
+          docker push $REGISTRY/$ECR_REPO:latest
           echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+      - name: Update K8s Deployment Image
+        env:
+          REGISTRY:  ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_URI=$REGISTRY/$ECR_REPO:$IMAGE_TAG
+          kubectl set image deployment/product-deployment \
+            product-service=$IMAGE_URI \
+            --namespace=sales
+        # NOTE: kubectl must be configured on the runner
+        # Add a step to configure kubeconfig before this if running from GitHub Actions
+        # e.g. aws eks update-kubeconfig --name shop-cluster --region $AWS_REGION
