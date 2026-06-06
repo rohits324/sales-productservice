@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
 
+env:
   AWS_REGION:      us-east-1
 #  ENVIRONMENT:     prod
   ECR_PRODUCT:     shopms-prod-product-service
