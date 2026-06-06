@@ -52,15 +52,15 @@ jobs:
           docker push $REGISTRY/$ECR_REPO:latest
           echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-      - name: Update K8s Deployment Image
-        env:
-          REGISTRY:  ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          IMAGE_URI=$REGISTRY/$ECR_REPO:$IMAGE_TAG
-          kubectl set image deployment/product-deployment \
-            product-service=$IMAGE_URI \
-            --namespace=sales
-        # NOTE: kubectl must be configured on the runner
-        # Add a step to configure kubeconfig before this if running from GitHub Actions
-        # e.g. aws eks update-kubeconfig --name shop-cluster --region $AWS_REGION
+      # - name: Update K8s Deployment Image
+      #   env:
+      #     REGISTRY:  ${{ steps.login-ecr.outputs.registry }}
+      #     IMAGE_TAG: ${{ github.sha }}
+      #   run: |
+      #     IMAGE_URI=$REGISTRY/$ECR_REPO:$IMAGE_TAG
+      #     kubectl set image deployment/product-deployment \
+      #       product-service=$IMAGE_URI \
+      #       --namespace=sales
+      #   # NOTE: kubectl must be configured on the runner
+      #   # Add a step to configure kubeconfig before this if running from GitHub Actions
+      #   # e.g. aws eks update-kubeconfig --name shop-cluster --region $AWS_REGION
